@@ -10,7 +10,9 @@ import type {
   ProteinSuggestion,
 } from "@/lib/types";
 
-const MAX_RESULTS = 10;
+const PAGE_SIZE = 12; // records fetched per "load more" batch
+const CONCURRENCY = 3; // parallel NCBI fetches, to stay under the rate limit
+const MAX_HITS = 200; // how many matching ids we ask NCBI for up front
 
 export default function AssemblyPage({
   params,
@@ -35,13 +37,53 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
   const [status, setStatus] = useState<"idle" | "searching" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [records, setRecords] = useState<ProteinRecord[]>([]);
-  const [hitCount, setHitCount] = useState(0);
+  const [allHits, setAllHits] = useState<ProteinHit[]>([]);
+  const [fetchedCount, setFetchedCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [fetchErrors, setFetchErrors] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<ProteinSuggestion[]>([]);
   const [searchedTerm, setSearchedTerm] = useState("");
   // Set when the exact word matched nothing and results were broadened to a
   // wildcard (e.g. "levan" → "levan*"), so we can say so above the results.
   const [broadenedFrom, setBroadenedFrom] = useState("");
+
+  const recordKey = (r: ProteinRecord) =>
+    (r.version || r.accession || "").toLowerCase();
+
+  // Fetch one record and append it, skipping duplicates — genus-wide searches
+  // return the same RefSeq protein once per strain, so dedupe by accession.
+  async function fetchOne(hit: ProteinHit) {
+    try {
+      const r = await fetch(`/api/protein-fetch?id=${encodeURIComponent(hit.id)}`);
+      const rec = (await r.json()) as ProteinRecord & { error?: string };
+      if (r.ok && !rec.error) {
+        setRecords((prev) =>
+          prev.some((x) => recordKey(x) === recordKey(rec)) ? prev : [...prev, rec],
+        );
+      } else {
+        setFetchErrors((prev) => [
+          ...prev,
+          rec.error ?? `HTTP ${r.status} for ${hit.id}`,
+        ]);
+      }
+    } catch (err) {
+      setFetchErrors((prev) => [
+        ...prev,
+        err instanceof Error ? err.message : `failed to load ${hit.id}`,
+      ]);
+    }
+  }
+
+  // Fetch a batch of hits a few at a time so we stay under NCBI's rate limit.
+  async function fetchBatch(hits: ProteinHit[]) {
+    const queue = [...hits];
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+        let next: ProteinHit | undefined;
+        while ((next = queue.shift())) await fetchOne(next);
+      }),
+    );
+  }
 
   async function runSearch(rawTerm: string) {
     const q = rawTerm.trim();
@@ -51,14 +93,15 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
     setStatus("searching");
     setError(null);
     setRecords([]);
-    setHitCount(0);
+    setAllHits([]);
+    setFetchedCount(0);
     setFetchErrors([]);
     setSuggestions([]);
     setBroadenedFrom("");
 
     try {
       const res = await fetch(
-        `/api/protein-search?q=${encodeURIComponent(q)}&taxid=${encodeURIComponent(taxid)}`,
+        `/api/protein-search?q=${encodeURIComponent(q)}&taxid=${encodeURIComponent(taxid)}&retmax=${MAX_HITS}`,
       );
       const data = (await res.json()) as {
         hits?: ProteinHit[];
@@ -68,50 +111,19 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
       };
       if (!res.ok || data.error) throw new Error(data.error ?? "Search failed");
 
-      // Keep the narrowing chips + the "broadened" note whether or not there
-      // were hits.
       setSuggestions(data.suggestions ?? []);
       if (data.broadenedFrom) setBroadenedFrom(data.broadenedFrom);
 
-      const hits = (data.hits ?? []).slice(0, MAX_RESULTS);
-      setHitCount(hits.length);
+      const hits = data.hits ?? [];
+      setAllHits(hits);
       if (hits.length === 0) {
         setStatus("done");
         return;
       }
 
-      // Each record is a separate NCBI round-trip. Fetch a few at a time rather
-      // than firing all at once: on serverless each request is its own instance
-      // hitting NCBI, so a bounded pool keeps us under the rate limit while
-      // still letting records render as they land.
-      const fetchOne = async (hit: ProteinHit) => {
-        try {
-          const r = await fetch(
-            `/api/protein-fetch?id=${encodeURIComponent(hit.id)}`,
-          );
-          const rec = (await r.json()) as ProteinRecord & { error?: string };
-          if (r.ok && !rec.error) setRecords((prev) => [...prev, rec]);
-          else
-            setFetchErrors((prev) => [
-              ...prev,
-              rec.error ?? `HTTP ${r.status} for ${hit.id}`,
-            ]);
-        } catch (err) {
-          setFetchErrors((prev) => [
-            ...prev,
-            err instanceof Error ? err.message : `failed to load ${hit.id}`,
-          ]);
-        }
-      };
-
-      const CONCURRENCY = 3;
-      const queue = [...hits];
-      await Promise.all(
-        Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-          let next: ProteinHit | undefined;
-          while ((next = queue.shift())) await fetchOne(next);
-        }),
-      );
+      const first = hits.slice(0, PAGE_SIZE);
+      setFetchedCount(first.length);
+      await fetchBatch(first);
       setStatus("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
@@ -119,9 +131,19 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
     }
   }
 
+  async function loadMore() {
+    setLoadingMore(true);
+    const start = fetchedCount;
+    const slice = allHits.slice(start, start + PAGE_SIZE);
+    setFetchedCount(start + slice.length);
+    await fetchBatch(slice);
+    setLoadingMore(false);
+  }
+
   // One shared scale across the result set makes the bars comparable.
   const maxLength = records.reduce((m, r) => Math.max(m, r.length ?? 0), 0) || 1;
   const searching = status === "searching";
+  const hasMore = fetchedCount < allHits.length;
 
   return (
     <div>
@@ -195,8 +217,8 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
         <div className="mt-7">
           <div className="thermal-track" />
           <p className="eyebrow mt-2">
-            {hitCount > 0
-              ? `${records.length} of ${hitCount} records retrieved`
+            {allHits.length > 0
+              ? `${records.length} of ${Math.min(PAGE_SIZE, allHits.length)} records retrieved`
               : "querying ncbi"}
           </p>
         </div>
@@ -235,25 +257,39 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
       {records.length > 0 && (
         <>
           <p className="eyebrow mt-8">
-            {records.length} record{records.length === 1 ? "" : "s"}
-            {hitCount > records.length && ` of ${hitCount}`}
+            {records.length} distinct record{records.length === 1 ? "" : "s"}
+            {allHits.length > fetchedCount && ` · ${allHits.length} matches total`}
           </p>
           <div className="mt-3 flex flex-col gap-3">
             {records.map((rec, i) => (
               <ProteinResultCard
-                key={`${rec.accession}-${i}`}
+                key={recordKey(rec)}
                 record={rec}
                 maxLength={maxLength}
                 index={i}
               />
             ))}
           </div>
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="mt-4 w-full rounded-md border border-rule bg-surface py-2.5 text-[13px] font-medium text-ink transition-colors hover:border-petrol disabled:opacity-40"
+            >
+              {loadingMore
+                ? "Loading…"
+                : `Load ${Math.min(PAGE_SIZE, allHits.length - fetchedCount)} more`}
+            </button>
+          )}
+          {loadingMore && <div className="thermal-track mt-3" />}
         </>
       )}
 
       {/* NCBI's title index matches whole words, so "levan" misses
           "levansucrase". Offer verified alternatives instead of a dead end. */}
-      {status === "done" && hitCount === 0 && !error && (
+      {status === "done" && allHits.length === 0 && !error && (
         <section className="mt-8 rounded-lg border border-rule bg-surface p-5">
           <p className="text-[14px] text-ink">
             No protein titled “{searchedTerm}” in this organism.
@@ -286,11 +322,12 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
         </section>
       )}
 
-      {status === "done" && hitCount > 0 && records.length === 0 && (
+      {status === "done" && allHits.length > 0 && records.length === 0 && (
         <div className="mt-8 rounded-lg border border-ember/30 bg-ember-soft p-4 text-[13px] text-ember">
           <p>
-            Found {hitCount} match{hitCount === 1 ? "" : "es"} but none could be
-            retrieved. NCBI may be rate-limiting — check that NCBI_API_KEY is set.
+            Found {allHits.length} match{allHits.length === 1 ? "" : "es"} but none
+            could be retrieved. NCBI may be rate-limiting — check that
+            NCBI_API_KEY is set.
           </p>
           {fetchErrors.length > 0 && (
             <ul className="data mt-2 list-disc pl-5 text-[11px] opacity-80">
