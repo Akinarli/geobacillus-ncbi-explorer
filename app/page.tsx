@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TaxonResult } from "@/lib/types";
 
@@ -141,6 +142,16 @@ export default function HomePage() {
               </button>
             </span>
           ))}
+        </p>
+
+        <p className="mt-3 text-[13px] text-muted">
+          Have a list of accessions?{" "}
+          <Link
+            href="/batch"
+            className="text-petrol underline decoration-rule underline-offset-[3px] hover:decoration-current"
+          >
+            batch lookup →
+          </Link>
         </p>
       </section>
     </div>
