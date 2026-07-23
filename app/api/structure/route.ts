@@ -20,10 +20,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 1. accession -> UniProt primary accession
+    // 1. accession -> UniProt primary accession + any experimental PDB structures
     const uniprotSearch = `https://rest.uniprot.org/uniprotkb/search?query=${encodeURIComponent(
       `xref:${accession}`,
-    )}&fields=accession&format=json&size=1`;
+    )}&fields=accession,xref_pdb&format=json&size=1`;
     const uRes = await fetch(uniprotSearch, {
       headers: { Accept: "application/json" },
       next: { revalidate: DAY },
@@ -35,13 +35,24 @@ export async function GET(request: Request) {
       );
     }
     const uData = (await uRes.json()) as {
-      results?: Array<{ primaryAccession?: string }>;
+      results?: Array<{
+        primaryAccession?: string;
+        uniProtKBCrossReferences?: Array<{ database?: string; id?: string }>;
+      }>;
     };
-    const uniprot = uData.results?.[0]?.primaryAccession;
+    const entry = uData.results?.[0];
+    const uniprot = entry?.primaryAccession;
+    const pdb = Array.from(
+      new Set(
+        (entry?.uniProtKBCrossReferences ?? [])
+          .filter((x) => x.database === "PDB" && x.id)
+          .map((x) => x.id as string),
+      ),
+    );
     if (!uniprot) {
-      if (checkOnly) return NextResponse.json({ available: false });
+      if (checkOnly) return NextResponse.json({ available: false, pdb });
       return NextResponse.json(
-        { error: `No UniProt entry maps to ${accession}.` },
+        { error: `No UniProt entry maps to ${accession}.`, pdb },
         { status: 404 },
       );
     }
@@ -59,9 +70,9 @@ export async function GET(request: Request) {
       },
     );
     if (!afRes.ok) {
-      if (checkOnly) return NextResponse.json({ available: false, uniprot });
+      if (checkOnly) return NextResponse.json({ available: false, uniprot, pdb });
       return NextResponse.json(
-        { error: `No AlphaFold model for ${uniprot}.`, uniprot },
+        { error: `No AlphaFold model for ${uniprot}.`, uniprot, pdb },
         { status: 404 },
       );
     }
@@ -71,26 +82,27 @@ export async function GET(request: Request) {
     }>;
     const pdbUrl = afData[0]?.pdbUrl;
     if (!pdbUrl) {
-      if (checkOnly) return NextResponse.json({ available: false, uniprot });
+      if (checkOnly) return NextResponse.json({ available: false, uniprot, pdb });
       return NextResponse.json(
-        { error: `No AlphaFold model for ${uniprot}.`, uniprot },
+        { error: `No AlphaFold model for ${uniprot}.`, uniprot, pdb },
         { status: 404 },
       );
     }
 
     // Availability confirmed — the badge doesn't need the model bytes.
-    if (checkOnly) return NextResponse.json({ available: true, uniprot });
+    if (checkOnly)
+      return NextResponse.json({ available: true, uniprot, pdb });
 
     const mRes = await fetch(pdbUrl, { next: { revalidate: DAY } });
     if (!mRes.ok) {
       return NextResponse.json(
-        { error: `AlphaFold model fetch failed (${mRes.status}).`, uniprot },
+        { error: `AlphaFold model fetch failed (${mRes.status}).`, uniprot, pdb },
         { status: 502 },
       );
     }
-    const pdb = await mRes.text();
+    const modelPdb = await mRes.text();
 
-    return NextResponse.json({ uniprot, format: "pdb", data: pdb });
+    return NextResponse.json({ uniprot, format: "pdb", data: modelPdb, pdb });
   } catch (err) {
     return handleError(err);
   }

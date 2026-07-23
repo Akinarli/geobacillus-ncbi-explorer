@@ -6,6 +6,7 @@ import ProteinResultCard from "@/components/ProteinResultCard";
 import OrthologPanel from "@/components/OrthologPanel";
 import StructureViewer from "@/components/StructureViewer";
 import SyntenyTrack from "@/components/SyntenyTrack";
+import IpgPanel from "@/components/IpgPanel";
 import type { ProteinRecord } from "@/lib/types";
 
 // A standalone, shareable page for a single protein record. Any accession or UID
@@ -67,6 +68,7 @@ export default function ProteinPage({
                 product={record.title}
                 genus={record.lineage.at(-1) ?? ""}
               />
+              <IpgPanel accession={record.version || record.accession} />
             </div>
           </>
         )}

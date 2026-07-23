@@ -18,6 +18,7 @@ type State = "idle" | "loading" | "done" | "none" | "error";
 export default function StructureViewer({ accession }: { accession: string }) {
   const [state, setState] = useState<State>("idle");
   const [uniprot, setUniprot] = useState<string | null>(null);
+  const [pdbIds, setPdbIds] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   async function load() {
@@ -29,9 +30,11 @@ export default function StructureViewer({ accession }: { accession: string }) {
       const data = (await res.json()) as {
         uniprot?: string;
         data?: string;
+        pdb?: string[];
         error?: string;
       };
       if (data.uniprot) setUniprot(data.uniprot);
+      if (data.pdb?.length) setPdbIds(data.pdb);
       if (res.status === 404) {
         setState("none");
         return;
@@ -98,6 +101,28 @@ export default function StructureViewer({ accession }: { accession: string }) {
       {state === "error" && (
         <p className="mt-2 text-[13px] text-ember">
           Could not load the structure.
+        </p>
+      )}
+
+      {/* Experimental crystal/cryo-EM structures, when this protein has them —
+          higher evidence than a prediction. */}
+      {pdbIds.length > 0 && (
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+          <span className="eyebrow">experimental (PDB)</span>
+          {pdbIds.slice(0, 8).map((id) => (
+            <a
+              key={id}
+              href={`https://www.rcsb.org/structure/${id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="data text-petrol underline decoration-rule underline-offset-[3px] hover:decoration-current"
+            >
+              {id}
+            </a>
+          ))}
+          {pdbIds.length > 8 && (
+            <span className="text-muted">+{pdbIds.length - 8}</span>
+          )}
         </p>
       )}
 
