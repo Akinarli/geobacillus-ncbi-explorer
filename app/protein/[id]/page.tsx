@@ -5,6 +5,7 @@ import Link from "next/link";
 import ProteinResultCard from "@/components/ProteinResultCard";
 import OrthologPanel from "@/components/OrthologPanel";
 import StructureViewer from "@/components/StructureViewer";
+import SyntenyTrack from "@/components/SyntenyTrack";
 import type { ProteinRecord } from "@/lib/types";
 
 // A standalone, shareable page for a single protein record. Any accession or UID
@@ -58,6 +59,7 @@ export default function ProteinPage({
           <>
             <ProteinResultCard record={record} />
             <div className="mt-4 rounded-lg border border-rule bg-surface px-5 pb-4">
+              <SyntenyTrack accession={record.version || record.accession} />
               <StructureViewer
                 accession={record.version || record.accession}
               />
