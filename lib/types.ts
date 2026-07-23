@@ -103,6 +103,20 @@ export interface ProteinRecord {
   domains?: ProteinDomain[];
 }
 
+/** Assembly-level genome statistics from NCBI Datasets, for the stats strip. */
+export interface AssemblyStats {
+  /** Total genome length in base pairs. */
+  genomeSize?: number;
+  gcPercent?: number;
+  contigN50?: number;
+  scaffolds?: number;
+  geneTotal?: number;
+  proteinCoding?: number;
+  pseudogene?: number;
+  /** Annotation release name, e.g. "NCBI RefSeq GCF_000750005.2-RS_2025_12_10". */
+  annotationName?: string;
+}
+
 export interface ApiError {
   error: string;
 }

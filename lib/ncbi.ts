@@ -98,6 +98,19 @@ export async function datasetsGenomeByTaxon(
   return res.json();
 }
 
+/** GET the NCBI Datasets genome report for a single assembly accession. */
+export async function datasetsGenomeByAccession(
+  accession: string,
+): Promise<unknown> {
+  const params = withCommonParams(new URLSearchParams());
+  const qs = params.toString();
+  const url = `${DATASETS_BASE}/genome/accession/${encodeURIComponent(accession)}/dataset_report${
+    qs ? `?${qs}` : ""
+  }`;
+  const res = await ncbiFetch(url);
+  return res.json();
+}
+
 /** Resolve a taxon name (or taxid) via the NCBI Datasets taxonomy endpoint.
  *  Unlike the genome report, this returns the taxon's OWN tax_id and rank, so
  *  "Geobacillus" resolves to the genus rather than to some species' assembly. */

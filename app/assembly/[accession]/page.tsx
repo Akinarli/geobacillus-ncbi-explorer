@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense, use, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ProteinResultCard from "@/components/ProteinResultCard";
+import AssemblyStatsStrip from "@/components/AssemblyStatsStrip";
 import type {
+  AssemblyStats,
   ProteinHit,
   ProteinRecord,
   ProteinSuggestion,
@@ -43,6 +45,22 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
   const [fetchErrors, setFetchErrors] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<ProteinSuggestion[]>([]);
   const [searchedTerm, setSearchedTerm] = useState("");
+  const [stats, setStats] = useState<AssemblyStats | null>(null);
+
+  // Load the genome stats strip once, independent of the protein search.
+  useEffect(() => {
+    let cancelled = false;
+    setStats(null);
+    fetch(`/api/assembly?accession=${encodeURIComponent(accession)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d?.stats) setStats(d.stats as AssemblyStats);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [accession]);
   // Set when the exact word matched nothing and results were broadened to a
   // wildcard (e.g. "levan" → "levan*"), so we can say so above the results.
   const [broadenedFrom, setBroadenedFrom] = useState("");
@@ -169,6 +187,8 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
           <span className="italic">{organism}</span>
         </p>
       </header>
+
+      {stats && <AssemblyStatsStrip stats={stats} />}
 
       <form
         onSubmit={(e) => {

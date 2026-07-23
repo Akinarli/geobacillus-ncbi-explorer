@@ -2,6 +2,8 @@
 // Only the fields we actually use are typed; everything is optional because the
 // API omits plenty depending on the assembly.
 
+import type { AssemblyStats } from "@/lib/types";
+
 export interface DatasetsReport {
   accession?: string;
   organism?: {
@@ -19,6 +21,40 @@ export interface DatasetsReport {
   // Present (in various shapes across API versions) when the assembly is
   // derived from type material.
   type_material?: { type_display_text?: string; type_label?: string } | null;
+  assembly_stats?: {
+    total_sequence_length?: number | string;
+    gc_percent?: number;
+    contig_n50?: number;
+    number_of_scaffolds?: number;
+  };
+  annotation_info?: {
+    name?: string;
+    stats?: {
+      gene_counts?: {
+        total?: number;
+        protein_coding?: number;
+        pseudogene?: number;
+        non_coding?: number;
+      };
+    };
+  };
+}
+
+/** Pull the assembly stats we display from a report row. */
+export function extractStats(r: DatasetsReport): AssemblyStats {
+  const s = r.assembly_stats ?? {};
+  const g = r.annotation_info?.stats?.gene_counts ?? {};
+  const size = s.total_sequence_length;
+  return {
+    genomeSize: size != null ? Number(size) : undefined,
+    gcPercent: s.gc_percent,
+    contigN50: s.contig_n50,
+    scaffolds: s.number_of_scaffolds,
+    geneTotal: g.total,
+    proteinCoding: g.protein_coding,
+    pseudogene: g.pseudogene,
+    annotationName: r.annotation_info?.name,
+  };
 }
 
 export function isFromTypeMaterial(r: DatasetsReport): boolean {
