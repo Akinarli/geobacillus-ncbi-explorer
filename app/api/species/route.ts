@@ -25,9 +25,12 @@ export async function GET(request: Request) {
   try {
     const data = (await datasetsGenomeByTaxon(taxid, {
       page_size: "1000",
-    })) as { reports?: DatasetsReport[] };
+    })) as { reports?: DatasetsReport[]; total_count?: number };
 
-    const reports = dedupePairedAccessions(data.reports ?? []);
+    const raw = data.reports ?? [];
+    const reports = dedupePairedAccessions(raw);
+    // NCBI caps us at page_size; a huge genus returns far more than we fetched.
+    const capped = (data.total_count ?? raw.length) > raw.length;
 
     const grouped = new Map<number, SpeciesSummary>();
     for (const r of reports) {
@@ -57,6 +60,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       species,
       totalAssemblies: reports.length,
+      total: data.total_count ?? reports.length,
+      capped,
     });
   } catch (err) {
     return handleError(err);

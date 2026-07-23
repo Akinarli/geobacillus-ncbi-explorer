@@ -41,9 +41,11 @@ export async function GET(request: Request) {
   try {
     const data = (await datasetsGenomeByTaxon(taxid, {
       page_size: "1000",
-    })) as { reports?: DatasetsReport[] };
+    })) as { reports?: DatasetsReport[]; total_count?: number };
 
-    const reports = dedupePairedAccessions(data.reports ?? []);
+    const raw = data.reports ?? [];
+    const reports = dedupePairedAccessions(raw);
+    const capped = (data.total_count ?? raw.length) > raw.length;
     const taxidNum = Number(taxid);
 
     const assemblies = reports
@@ -60,7 +62,11 @@ export async function GET(request: Request) {
       })
       .map((r) => toAssembly(r, taxidNum));
 
-    return NextResponse.json({ assemblies });
+    return NextResponse.json({
+      assemblies,
+      total: data.total_count ?? reports.length,
+      capped,
+    });
   } catch (err) {
     return handleError(err);
   }

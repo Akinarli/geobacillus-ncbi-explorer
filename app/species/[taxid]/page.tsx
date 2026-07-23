@@ -28,6 +28,7 @@ function SpeciesView({ params }: { params: Promise<{ taxid: string }> }) {
   const [assemblies, setAssemblies] = useState<Assembly[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [capped, setCapped] = useState<{ total: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +37,7 @@ function SpeciesView({ params }: { params: Promise<{ taxid: string }> }) {
     setAssemblies(null);
     setError(null);
     setFilter("");
+    setCapped(null);
 
     (async () => {
       try {
@@ -54,10 +56,13 @@ function SpeciesView({ params }: { params: Promise<{ taxid: string }> }) {
         const data = (await res.json()) as {
           species?: SpeciesSummary[];
           assemblies?: Assembly[];
+          total?: number;
+          capped?: boolean;
           error?: string;
         };
         if (!res.ok || data.error) throw new Error(data.error ?? "Failed to load");
         if (cancelled) return;
+        if (data.capped) setCapped({ total: data.total ?? 0 });
         if (isGenus) setSpecies(data.species ?? []);
         else setAssemblies(data.assemblies ?? []);
       } catch (err) {
@@ -115,6 +120,22 @@ function SpeciesView({ params }: { params: Promise<{ taxid: string }> }) {
         <p className="mt-6 rounded-md border border-ember/30 bg-ember-soft px-3 py-2 text-[13px] text-ember">
           {error}
         </p>
+      )}
+
+      {capped && (
+        <div className="mt-6 rounded-md border border-petrol/25 bg-petrol-soft/40 px-3 py-2 text-[13px] text-ink">
+          This taxon has{" "}
+          <span className="data">{capped.total.toLocaleString("en-US")}</span>{" "}
+          assemblies — showing a sample of the first 1,000. Narrow to a species,
+          or{" "}
+          <Link
+            href="/batch"
+            className="text-petrol underline decoration-rule underline-offset-[3px] hover:decoration-current"
+          >
+            paste protein accessions
+          </Link>{" "}
+          for precise results.
+        </div>
       )}
 
       {!taxon && !error && <div className="thermal-track mt-8" />}
