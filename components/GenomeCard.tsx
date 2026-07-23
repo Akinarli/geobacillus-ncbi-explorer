@@ -98,13 +98,21 @@ export default function GenomeCard({
         )}
       </dl>
 
-      <Link
-        href={internalHref}
-        className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-petrol transition-transform hover:translate-x-0.5"
-      >
-        search proteins
-        <span aria-hidden>→</span>
-      </Link>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Link
+          href={internalHref}
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-petrol transition-transform hover:translate-x-0.5"
+        >
+          search proteins
+          <span aria-hidden>→</span>
+        </Link>
+        <Link
+          href={internalHref}
+          className="text-[12px] text-muted hover:text-petrol"
+        >
+          ecology &amp; refs
+        </Link>
+      </div>
     </article>
   );
 }

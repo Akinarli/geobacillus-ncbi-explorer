@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ProteinResultCard from "@/components/ProteinResultCard";
 import AssemblyStatsStrip from "@/components/AssemblyStatsStrip";
+import EcologyPanel from "@/components/EcologyPanel";
 import type {
   AssemblyStats,
   ProteinHit,
@@ -210,6 +211,8 @@ function AssemblyView({ params }: { params: Promise<{ accession: string }> }) {
       </header>
 
       {stats && <AssemblyStatsStrip stats={stats} />}
+
+      <EcologyPanel accession={accession} />
 
       <form
         onSubmit={(e) => {
