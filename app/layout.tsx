@@ -26,9 +26,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Geobacillus Explorer — NCBI genomes & proteins",
+  title: "Koeus — bacterial genome & protein explorer",
   description:
-    "Search Geobacillus and Parageobacillus genomes on NCBI and read any protein record as a clean, citable card.",
+    "Explore bacterial genomes and protein records on NCBI: read any GenPept record as a clean, citable card with domains, 3D structure, gene neighborhood and comparison.",
 };
 
 export default function RootLayout({
@@ -47,12 +47,11 @@ export default function RootLayout({
           <header className="border-b border-rule py-5">
             <a href="/" className="inline-block no-underline">
               <span className="display text-[19px] font-semibold text-ink">
-                Geobacillus
+                Koeus
               </span>
-              <span className="display text-[19px] text-muted"> Explorer</span>
             </a>
             <p className="eyebrow mt-1.5">
-              NCBI genomes &amp; protein records · thermophilic bacilli
+              NCBI bacterial genomes &amp; protein records
             </p>
           </header>
 

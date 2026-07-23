@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TaxonResult } from "@/lib/types";
 
-// Two genera, and the assembly counts NCBI reports for them. Showing the counts
-// up front tells you the size of what you're searching before you type.
+// A few genera to start from. Small genera browse best; the note hints at size.
 const GENERA = [
-  { name: "Geobacillus", note: "hot springs, compost, oil reservoirs" },
-  { name: "Parageobacillus", note: "split from Geobacillus in 2015" },
+  { name: "Geobacillus", note: "thermophile · 248 genomes" },
+  { name: "Parageobacillus", note: "thermophile · 68 genomes" },
+  { name: "Deinococcus", note: "radiation-resistant" },
 ];
 
-const SPECIES_EXAMPLES = ["Geobacillus icigianus", "Parageobacillus thermoglucosidasius"];
+const SPECIES_EXAMPLES = ["Geobacillus icigianus", "Bacillus subtilis"];
 
 export default function HomePage() {
   const router = useRouter();
@@ -79,7 +79,7 @@ export default function HomePage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Geobacillus"
+            placeholder="Geobacillus, Bacillus subtilis, WP_051985049…"
             autoFocus
             autoComplete="off"
             spellCheck={false}
@@ -102,7 +102,7 @@ export default function HomePage() {
       </form>
 
       <section className="rise mt-12" style={{ animationDelay: "150ms" }}>
-        <p className="eyebrow">browse a genus</p>
+        <p className="eyebrow">start from a genus</p>
         <ul className="mt-3 divide-y divide-rule border-y border-rule">
           {GENERA.map((g) => (
             <li key={g.name}>

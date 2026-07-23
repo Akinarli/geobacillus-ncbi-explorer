@@ -1,11 +1,14 @@
-# Geobacillus / Parageobacillus NCBI Explorer
+# Koeus — bacterial genome & protein explorer
 
-Pick a *Geobacillus* / *Parageobacillus* species, browse its genome assemblies
-(type-material assemblies surfaced first), then look up a gene/protein by name.
-The app queries NCBI, fetches the matching GenBank/GenPept protein record, parses
-it with BioPython, and renders a clean academic-style result card.
+Named after the Titan of intellect and inquiry. Explore bacterial genomes and
+protein records on NCBI: pick a genus/species (or paste a protein accession),
+browse genome assemblies (type-material first), and read any GenPept record as a
+clean, citable card — with domain architecture, GO terms, amino-acid sequence,
+AlphaFold 3D structure, gene neighborhood (synteny), ortholog scan, and
+side-by-side comparison with % identity and a phylogenetic tree.
 
-See [`PROJECT_SPEC1.md`](./PROJECT_SPEC1.md) for the full spec.
+Focused on *Geobacillus* / *Parageobacillus* (its origin) but works for any
+bacterial taxon. See [`PROJECT_SPEC1.md`](./PROJECT_SPEC1.md) for the original spec.
 
 ## Stack
 
